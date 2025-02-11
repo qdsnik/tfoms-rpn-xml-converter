@@ -9,19 +9,20 @@ python3 conv.py <имя xml>.xml
 ```
 
 Совместимость: python 3.7+
+
 Зависимости: lxml
 
 Суть процесса:
     Файлы преобразуются к поддерживаемому МИС формату и сохраняются в каталог `./converted`
 
-    Для prks:
-        Переименовывается тег: ENP -> NPOLIS
-        Добавляются теги: <VPOLIS>3</VPOLIS><SPOLIS/>
-        Удаляются теги: MD_DEP_ID, AREA_TYPE, DOC_ID
-        Меняет версию в заголовке с 1.2 на 1.0 (PRK -> ZGLV -> VERSION)
-    
-    Для ozps:
-        Переименовывается тег: ENP -> NPOLIS
-        Добавляются теги: <VPOLIS>3</VPOLIS><SPOLIS/>
-        Убирается расширение из названии файла в ZL_LIST -> ZGLV -> FILENAME
-        Меняет версию в заголовке с 1.2 на 1.0 (ZL_LIST -> ZGLV -> VERSION)
+Для prks:
+    переименовывается тег: ENP -> NPOLIS, 
+    добавляются теги: <VPOLIS>3</VPOLIS><SPOLIS/>, 
+    удаляются теги: MD_DEP_ID, AREA_TYPE, DOC_ID, 
+    меняет версию в заголовке с 1.2 на 1.0 (PRK -> ZGLV -> VERSION)
+
+Для ozps:
+    переименовывается тег: ENP -> NPOLIS, 
+    добавляются теги: <VPOLIS>3</VPOLIS><SPOLIS/>, 
+    убирается расширение из названии файла в ZL_LIST -> ZGLV -> FILENAME, 
+    меняет версию в заголовке с 1.2 на 1.0 (ZL_LIST -> ZGLV -> VERSION)
