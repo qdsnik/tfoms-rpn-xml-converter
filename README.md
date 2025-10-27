@@ -40,7 +40,6 @@ python3 conv.py <имя xml>.xml
             <FILENAME> -> <FNAME> + меняем содержимое
         Удаляем: YEAR, MONTH, ZAP
         Добавляем: <AREA_TYPE>1</AREA_TYPE>
-
     В записях:
         Переименовываем тег PERS -> REC
         Меняем:
