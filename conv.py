@@ -3,6 +3,11 @@ from pathlib import Path
 from lxml import etree
 import argparse
 import sys
+import datetime
+
+
+# Код МО из F032
+CODE_MO = '352530'
 
 
 def init() -> argparse.ArgumentParser:
@@ -21,12 +26,12 @@ def remove_node(parent, name):
         parent.remove(node_for_remove)
 
 
-def save_result(dom, src_file_path: Path):
+def save_result(dom, src_file_path: Path, *, new_file_name: str = None) -> None:
     """Сохраняет результат обработки рядом с исходным файлом в каталоге `converted`."""
     dst_path = Path(src_file_path.parent) / 'converted'
     if not dst_path.exists():
         dst_path.mkdir()
-    dst_file_path = str(dst_path / file_path.name)
+    dst_file_path = str(dst_path / (new_file_name or src_file_path.name))
     f = open(dst_file_path, "w", encoding='cp1251', errors=None, newline='\r\n')
     f.write(etree.tostring(dom, pretty_print=True, encoding='Windows-1251', xml_declaration=True).decode('cp1251'))
     f.close()
@@ -67,6 +72,64 @@ def prepare_ozps(file_path: Path):
         remove_node(pers, 'ENP')
 
     save_result(root, file_path)
+    print('Done.')
+
+
+def prepare_szpm(file_path: Path):
+    """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
+    today = datetime.now()
+    new_file_name = f'ATM{CODE_MO}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{today.day}'
+
+    tree = etree.parse(str(file_path))
+    root = tree.getroot()
+    
+    xml_root_tag = root.find('ZL_LIST')
+    xml_root_tag.tag = 'ATT'
+
+    zglv_tag = root.find('ZGLV') 
+    zglv_tag.find('VERSION').text = '1.3'
+
+    date_tag = zglv_tag.find('DATE')
+    date_tag.tag = 'FDATE'
+
+    filename_tag = zglv_tag.find('FILENAME')
+    filename_tag.tag = 'FNAME'
+    filename_tag.text = new_file_name
+
+    for tag_name in ('YEAR', 'MONTH', 'ZAP'):
+        removing_tag = zglv_tag.find(tag_name)
+        if removing_tag != None:
+            zglv_tag.remove(removing_tag)
+
+    etree.SubElement(zglv_tag, 'AREA_TYPE').text = '1'
+
+    for pers in root.findall('PERS'):
+        pers.tag = 'REC'
+
+        for tag_name in ('PR_NOV', 'ID_PAC', 'DOCSER', 'DOCNUM', 'VPOLIS', 'SMO', 'DOC_POST'):
+            removing_tag = pers.find(tag_name)
+            if removing_tag != None:
+                pers.remove(removing_tag)
+        
+        enp_tag = pers.find('NPOLIS')
+        enp_tag.tag = 'ENP'
+
+        datez_tag = pers.find('DATEZ')
+        datez_tag.tag = 'DATE_ATTACH_B'
+
+        prz_tag = pers.find('PRZ')
+        prz_tag.tag = 'ATTACH_METHOD'
+        prz_tag.text = '2'
+
+        # Убрать все разделители.
+        doc_code_tag = pers.find('DOC_CODE')
+        if doc_code_tag != None:
+            doc_code_tag.text = doc_code_tag.text.replace('-', '').replace(' ', '')
+
+        # Согласно спецификации должен указываться, но поле опциональное.
+        # etree.SubElement(pers, 'DOC_ID').text = ''
+
+    save_result(root, file_path, new_file_name=new_file_name)
     print('Done.')
 
 
