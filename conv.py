@@ -14,7 +14,7 @@ def init() -> argparse.ArgumentParser:
     """Возвращает объект для разбора входных параметров."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument ('file', type=str, help='xml file for handling')
+    parser.add_argument('file', type=str, help='xml file for handling')
 
     return parser
 
@@ -36,6 +36,7 @@ def save_result(dom, src_file_path: Path, *, new_file_name: str = None) -> None:
     f.write(etree.tostring(dom, pretty_print=True, encoding='Windows-1251', xml_declaration=True).decode('cp1251'))
     f.close()
 
+
 def prepare_prks(file_path: Path):
     """Преобразует и сохраняет измененный файл prks."""
     tree = etree.parse(str(file_path))
@@ -53,6 +54,7 @@ def prepare_prks(file_path: Path):
 
     save_result(root, file_path)
     print('Done.')
+
 
 def prepare_ozps(file_path: Path):
     """Преобразует и сохраняет измененный файл ozps."""
@@ -85,7 +87,7 @@ def prepare_szpm(file_path: Path):
     
     root.tag = 'ATT'
 
-    zglv_tag = root.find('ZGLV') 
+    zglv_tag = root.find('ZGLV')
     zglv_tag.find('VERSION').text = '1.3'
 
     date_tag = zglv_tag.find('DATE')
@@ -128,7 +130,7 @@ def prepare_szpm(file_path: Path):
         # Согласно спецификации должен указываться, но поле опциональное.
         # etree.SubElement(pers, 'DOC_ID').text = ''
 
-    save_result(root, file_path, new_file_name=new_file_name)
+    save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
 
 
