@@ -3,7 +3,7 @@ from pathlib import Path
 from lxml import etree
 import argparse
 import sys
-import datetime
+from datetime import datetime
 
 
 # Код МО из F032
@@ -83,8 +83,7 @@ def prepare_szpm(file_path: Path):
     tree = etree.parse(str(file_path))
     root = tree.getroot()
     
-    xml_root_tag = root.find('ZL_LIST')
-    xml_root_tag.tag = 'ATT'
+    root.tag = 'ATT'
 
     zglv_tag = root.find('ZGLV') 
     zglv_tag.find('VERSION').text = '1.3'
@@ -152,3 +151,6 @@ if __name__ == '__main__':
 
     elif file_path.name.lower().startswith('ozps'):
         prepare_ozps(file_path)
+
+    elif file_path.name.lower().startswith('szpm'):
+        prepare_szpm(file_path)
