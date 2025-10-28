@@ -78,7 +78,7 @@ def prepare_ozps(file_path: Path):
     print('Done.')
 
 
-def prepare_szpm(file_path: Path):
+def prepare_szpm(file_path: Path, ids_for_exclude=None):
     """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
     today = datetime.now()
     new_file_name = f'ATM{CODE_MO}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{today.day}'
@@ -143,10 +143,15 @@ def prepare_szpm(file_path: Path):
     # Удаляем неподходящие данные.
     for item in pers_for_remove:
         root.remove(item)
-    
-    # Исправляем порядок номеров.
-    for i, pers in enumerate(root.findall('REC'), start=1):
-        pers.find('N_ZAP').text = str(i)
+
+    # Удаляем исключенные записи.
+    pers_for_remove = []
+    for pers in root.findall('REC'):        
+        if pers.find('N_ZAP').text in ids_for_exclude.split(','): 
+            pers_for_remove.append(pers)
+
+    for item in pers_for_remove:
+        root.remove(item)
 
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
@@ -167,10 +172,6 @@ def prepare_atm(file_path: Path, ids_for_exclude=None):
 
     for item in pers_for_remove:
         root.remove(item)
-    
-    # Исправляем порядок номеров.
-    for i, pers in enumerate(root.findall('REC'), start=1):
-        pers.find('N_ZAP').text = str(i)
     
     save_result(root, file_path)
     print('Done.')
