@@ -104,7 +104,16 @@ def prepare_szpm(file_path: Path):
 
     etree.SubElement(zglv_tag, 'AREA_TYPE').text = '1'
 
+    pers_for_remove = []
     for pers in root.findall('PERS'):
+        
+        doc_code_tag = pers.find('DOC_CODE')
+        # Проверяем, чтобы к пациенту был закреплен медик,
+        # иначе удаляем из обработки такие заявления.
+        if doc_code_tag is None:
+            pers_for_remove.append(pers)
+            continue
+        
         pers.tag = 'REC'
 
         for tag_name in ('PR_NOV', 'ID_PAC', 'DOCSER', 'DOCNUM', 'VPOLIS', 'SMO', 'DOC_POST'):
@@ -129,6 +138,14 @@ def prepare_szpm(file_path: Path):
 
         # Согласно спецификации должен указываться, но поле опциональное.
         # etree.SubElement(pers, 'DOC_ID').text = ''
+
+    # Удаляем неподходящие данные.
+    for item in pers_for_remove:
+        root.remove(item)
+    
+    # Исправляем порядок номеров.
+    for i, pers in enumerate(root.findall('REC'), start=1):
+        pers.find('N_ZAP') = str(i)
 
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
