@@ -9,7 +9,6 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
-files/
 develop-eggs/
 dist/
 downloads/
@@ -173,3 +172,8 @@ cython_debug/
 
 # IDE
 .vscode
+
+# ignored project files
+conf.json
+/test_files/converted
+files/

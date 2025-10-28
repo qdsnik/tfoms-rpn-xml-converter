@@ -1,9 +1,49 @@
 from __future__ import annotations
+import json
+import os
 from pathlib import Path
 from lxml import etree
 import argparse
 import sys
 from datetime import datetime
+
+
+class Config:
+    def __init__(self):
+        
+        today = datetime.now()
+        self.month_packet_counter_key = f"{today.year}-{today.month}"
+
+        self.config_default_path = os.path.join(os.getcwd(), 'conf.json')
+        if not os.path.exists(self.config_default_path):
+            with open(self.config_default_path, 'w') as f:
+                json.dump({'month_packet_counter': {self.month_packet_counter_key: 0}}, f)
+        
+        self.conf_data = None
+
+    def load(self):
+        with open(self.config_default_path, 'r') as f:
+            self.conf_data = json.load(f)
+        
+        # Инициализируем счетчик, при обновлении даты.
+        if self.month_packet_counter_key not in self.conf_data['month_packet_counter']:
+            self.conf_data['month_packet_counter'][key] = 0
+
+    def save(self):
+        with open(self.config_default_path, 'w') as f:
+            json.dump(self.conf_data, f)
+
+    def inc_month_counter(self):
+        if not self.conf_data:
+            self.load()
+        self.conf_data['month_packet_counter'][self.month_packet_counter_key] += 1
+        self.save()
+        return self.conf_data['month_packet_counter'][self.month_packet_counter_key]
+
+    def get_month_counter(self):
+        if not self.conf_data:
+            self.load()
+        return self.conf_data['month_packet_counter'][self.month_packet_counter_key]
 
 
 # Код МО из F032
@@ -78,10 +118,10 @@ def prepare_ozps(file_path: Path):
     print('Done.')
 
 
-def prepare_szpm(file_path: Path, ids_for_exclude=None):
+def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
     today = datetime.now()
-    new_file_name = f'ATM{CODE_MO}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{today.day}'
+    new_file_name = f'ATM{CODE_MO}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
 
     tree = etree.parse(str(file_path))
     root = tree.getroot()
@@ -181,8 +221,9 @@ def prepare_atm(file_path: Path, ids_for_exclude=None):
 if __name__ == '__main__':
     parser = init()
     args = parser.parse_args()
-
     file_path = Path(args.file)
+
+    conf = Config()
 
     if not file_path.exists():
         print(f'handling file not found in path "{file_path}"')
@@ -199,7 +240,7 @@ if __name__ == '__main__':
         prepare_ozps(file_path)
 
     elif file_path.name.lower().startswith('szpm'):
-        prepare_szpm(file_path, args.exclude_ids)
+        prepare_szpm(file_path, conf, args.exclude_ids)
 
     elif file_path.name.lower().startswith('atm'):
         prepare_atm(file_path, args.exclude_ids)
