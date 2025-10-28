@@ -10,6 +10,11 @@ http://new.oms35.ru/upload/Inf_MO_i_SMO/Informazion_vzaim/Reglament_030925.pdf
 ```
 python3 conv.py <имя xml>.xml
 ```
+Для удаления записей при повторной обработке можно передасть ключ `--exclude_ids`, пример:
+```
+    python3 conv.py <имя xml>.xml --exclude_ids=1,5,7
+```
+
 
 Для управления зависимоcтями используется uv. Для инициализации окружения предлагается использовать команду ниже.
 ```

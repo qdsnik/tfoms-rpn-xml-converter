@@ -15,6 +15,7 @@ def init() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
     parser.add_argument('file', type=str, help='xml file for handling')
+    parser.add_argument('--exclude_ids', type=str, default='', help='id records for exclude')
 
     return parser
 
@@ -151,6 +152,30 @@ def prepare_szpm(file_path: Path):
     print('Done.')
 
 
+def prepare_atm(file_path: Path, ids_for_exclude=None):
+    """Изменяет файл atm файл для прикрепления по терапевтическому профилю."""
+
+    if not ids_for_exclude:
+        return
+
+    tree = etree.parse(str(file_path))
+    root = tree.getroot()
+    pers_for_remove = []
+    for pers in root.findall('REC'):        
+        if pers.find('N_ZAP').text in ids_for_exclude.split(','): 
+            pers_for_remove.append(pers)
+
+    for item in pers_for_remove:
+        root.remove(item)
+    
+    # Исправляем порядок номеров.
+    for i, pers in enumerate(root.findall('REC'), start=1):
+        pers.find('N_ZAP').text = str(i)
+    
+    save_result(root, file_path)
+    print('Done.')
+
+
 if __name__ == '__main__':
     parser = init()
     args = parser.parse_args()
@@ -173,3 +198,6 @@ if __name__ == '__main__':
 
     elif file_path.name.lower().startswith('szpm'):
         prepare_szpm(file_path)
+
+    elif file_path.name.lower().startswith('atm'):
+        prepare_atm(file_path, args.exclude_ids)
