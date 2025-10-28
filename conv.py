@@ -145,13 +145,14 @@ def prepare_szpm(file_path: Path, ids_for_exclude=None):
         root.remove(item)
 
     # Удаляем исключенные записи.
-    pers_for_remove = []
-    for pers in root.findall('REC'):        
-        if pers.find('N_ZAP').text in ids_for_exclude.split(','): 
-            pers_for_remove.append(pers)
+    if ids_for_exclude:
+        pers_for_remove = []
+        for pers in root.findall('REC'):        
+            if pers.find('N_ZAP').text in ids_for_exclude.split(','): 
+                pers_for_remove.append(pers)
 
-    for item in pers_for_remove:
-        root.remove(item)
+        for item in pers_for_remove:
+            root.remove(item)
 
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
