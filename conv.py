@@ -145,7 +145,7 @@ def prepare_szpm(file_path: Path):
     
     # Исправляем порядок номеров.
     for i, pers in enumerate(root.findall('REC'), start=1):
-        pers.find('N_ZAP') = str(i)
+        pers.find('N_ZAP').text = str(i)
 
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
