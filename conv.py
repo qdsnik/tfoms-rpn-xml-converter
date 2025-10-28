@@ -198,7 +198,7 @@ if __name__ == '__main__':
         prepare_ozps(file_path)
 
     elif file_path.name.lower().startswith('szpm'):
-        prepare_szpm(file_path)
+        prepare_szpm(file_path, args.exclude_ids)
 
     elif file_path.name.lower().startswith('atm'):
         prepare_atm(file_path, args.exclude_ids)
