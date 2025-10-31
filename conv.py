@@ -27,7 +27,7 @@ class Config:
         
         # Инициализируем счетчик, при обновлении даты.
         if self.month_packet_counter_key not in self.conf_data['month_packet_counter']:
-            self.conf_data['month_packet_counter'][key] = 0
+            self.conf_data['month_packet_counter'][self.month_packet_counter_key] = 0
 
     def save(self):
         with open(self.config_default_path, 'w') as f:

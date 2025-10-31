@@ -176,4 +176,4 @@ cython_debug/
 # ignored project files
 conf.json
 /test_files/converted
-files/
+/files
