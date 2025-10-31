@@ -14,9 +14,9 @@
 		<N_ZAP>1</N_ZAP>
 		<PR_NOV>0</PR_NOV>
 		<ID_PAC>351111111111111</ID_PAC>
-		<FAM>тест1</FAM>
-		<IM>тест1</IM>
-		<OT>тест1</OT>
+		<FAM>пїЅпїЅпїЅпїЅ1</FAM>
+		<IM>пїЅпїЅпїЅпїЅ1</IM>
+		<OT>пїЅпїЅпїЅпїЅ1</OT>
 		<W>2</W>
 		<DR>1990-01-01</DR>
 		<DOCSER>11 11</DOCSER>
@@ -34,9 +34,9 @@
 		<N_ZAP>2</N_ZAP>
 		<PR_NOV>0</PR_NOV>
 		<ID_PAC>351111111111112</ID_PAC>
-		<FAM>тест2</FAM>
-		<IM>тест2</IM>
-		<OT>тест2</OT>
+		<FAM>пїЅпїЅпїЅпїЅ2</FAM>
+		<IM>пїЅпїЅпїЅпїЅ2</IM>
+		<OT>пїЅпїЅпїЅпїЅ2</OT>
 		<W>2</W>
 		<DR>1990-01-01</DR>
 		<DOCSER>11 11</DOCSER>
@@ -48,15 +48,15 @@
 		<PRZ>1</PRZ>
 		<DOC_CODE>111-111-111 11</DOC_CODE>
 		<DOC_POST>1</DOC_POST>
-		<MO_DEP_ID>1.2.643.5.1.13.13.12.2.35.3294.0.368692</MO_DEP_ID>
+		<MO_DEP_ID>1.2.643.5.1.13.13.12.2.35.3294.0.999999</MO_DEP_ID>
 	</PERS>
 	<PERS>
 		<N_ZAP>3</N_ZAP>
 		<PR_NOV>0</PR_NOV>
 		<ID_PAC>351111111111113</ID_PAC>
-		<FAM>тест3</FAM>
-		<IM>тест3</IM>
-		<OT>тест3</OT>
+		<FAM>пїЅпїЅпїЅпїЅ3</FAM>
+		<IM>пїЅпїЅпїЅпїЅ3</IM>
+		<OT>пїЅпїЅпїЅпїЅ3</OT>
 		<W>2</W>
 		<DR>1990-01-01</DR>
 		<DOCSER>11 11</DOCSER>
@@ -74,9 +74,9 @@
 		<N_ZAP>4</N_ZAP>
 		<PR_NOV>0</PR_NOV>
 		<ID_PAC>351111111111114</ID_PAC>
-		<FAM>тест4</FAM>
-		<IM>тест4</IM>
-		<OT>тест4</OT>
+		<FAM>пїЅпїЅпїЅпїЅ4</FAM>
+		<IM>пїЅпїЅпїЅпїЅ4</IM>
+		<OT>пїЅпїЅпїЅпїЅ4</OT>
 		<W>2</W>
 		<DR>1990-01-01</DR>
 		<DOCSER>11 11</DOCSER>
@@ -88,6 +88,6 @@
 		<PRZ>1</PRZ>
 		<DOC_CODE>111-111-11 11</DOC_CODE>
 		<DOC_POST>1</DOC_POST>
-		<MO_DEP_ID>1.2.643.5.1.13.13.12.2.35.3294.0.368692</MO_DEP_ID>
+		<MO_DEP_ID>1.2.643.5.1.13.13.12.2.35.3294.0.888888</MO_DEP_ID>
 	</PERS>
 </ZL_LIST>
