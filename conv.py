@@ -11,6 +11,7 @@ from datetime import datetime
 DEFAULT_CONFIG = {
     'month_packet_counter': {"2025-10": 0},
     'code_lpu': '352530',  # Код МО из F032
+    'allow_save_atm_to_new_package': True,
 }
 CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
 
@@ -73,25 +74,6 @@ class Config:
         return self.conf_data['month_packet_counter'][self.month_packet_counter_key]
 
 
-def init() -> argparse.ArgumentParser:
-    """Возвращает объект для разбора входных параметров."""
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        '-inconf',
-        '--init_config',
-        action='store_true',
-        help=(
-            'Инициализировать файл конфигурации, чтобы изменить настройки перед первым использованием. '
-            'Если файл конфигурации уже существует, добавит только новые ключи.'
-        )
-    )
-    parser.add_argument('-f', '--file', type=str, required=False, help='xml для обработки')
-    parser.add_argument('--exclude_ids', type=str, default='', help='id записей для исключения из SZPM или ATM файлов')
-
-    return parser
-
-
 def remove_node(parent, name):
     """Удаляет из указанного родителя тег с переданным именем."""
     node_for_remove = parent.find(name)
@@ -99,7 +81,7 @@ def remove_node(parent, name):
         parent.remove(node_for_remove)
 
 
-def save_result(dom, src_file_path: Path, *, new_file_name: str = None) -> None:
+def save_result(dom, src_file_path: Path, *, new_file_name: str = None) -> str:
     """Сохраняет результат обработки рядом с исходным файлом в каталоге `converted`."""
     dst_path = Path(src_file_path.parent) / 'converted'
     if not dst_path.exists():
@@ -108,6 +90,8 @@ def save_result(dom, src_file_path: Path, *, new_file_name: str = None) -> None:
     f = open(dst_file_path, "w", encoding='cp1251', errors=None, newline='\r\n')
     f.write(etree.tostring(dom, pretty_print=True, encoding='Windows-1251', xml_declaration=True).decode('cp1251'))
     f.close()
+
+    return (new_file_name or src_file_path.name)
 
 
 def prepare_prks(file_path: Path):
@@ -150,11 +134,16 @@ def prepare_ozps(file_path: Path):
     print('Done.')
 
 
-def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
-    """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
+def get_new_atm_name(config: Config) -> str:
+    """Возвращает имя ATM файла с новым номером пакета."""
     today = datetime.now()
     code_lpu = config['code_lpu']
-    new_file_name = f'ATM{code_lpu}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+    return f'ATM{code_lpu}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+
+
+def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
+    """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
+    new_file_name = get_new_atm_name(config)
 
     tree = etree.parse(str(file_path))
     root = tree.getroot()
@@ -231,23 +220,60 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     print('Done.')
 
 
-def prepare_atm(file_path: Path, ids_for_exclude=None):
-    """Изменяет файл atm файл для прикрепления по терапевтическому профилю."""
+def prepare_atm(file_path: Path, conf: Config, *, flk_path: Path, extended_ids_for_exclude=None) -> str:
+    """Исправляет файл atm исключением дефектных строк из ФЛК."""
+    ids_for_exclude = []
+    if flk_path:
+        flk_tree = etree.parse(str(flk_path))
+        flk_root = flk_tree.getroot()
+        flk_result = flk_root.find('ZGLV').find('FLK_RES').text
+
+        if int(flk_result) == 0:
+            return ''
+    
+        ids_for_exclude = [x.find('N_ZAP').text for x in flk_root.findall('ERROR')]
+    
+    if extended_ids_for_exclude:
+        ids_for_exclude.extend(extended_ids_for_exclude.split(','))
+
     if not ids_for_exclude:
-        return
+        raise RuntimeError('Нет данных для обрабоки ATM')
 
     tree = etree.parse(str(file_path))
     root = tree.getroot()
     pers_for_remove = []
     for pers in root.findall('REC'):        
-        if pers.find('N_ZAP').text in ids_for_exclude.split(','): 
+        if pers.find('N_ZAP').text in ids_for_exclude: 
             pers_for_remove.append(pers)
 
     for item in pers_for_remove:
         root.remove(item)
     
-    save_result(root, file_path)
-    print('Done.')
+    if conf['allow_save_atm_to_new_package']:
+        new_file_name = get_new_atm_name(conf)
+        return save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
+    
+    return save_result(root, file_path)
+
+
+def init() -> argparse.ArgumentParser:
+    """Возвращает объект для разбора входных параметров."""
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-inconf',
+        '--init_config',
+        action='store_true',
+        help=(
+            'Инициализировать файл конфигурации, чтобы изменить настройки перед первым использованием. '
+            'Если файл конфигурации уже существует, добавит только новые ключи.'
+        )
+    )
+    parser.add_argument('-f', '--file', type=str, required=False, help='xml для обработки')
+    parser.add_argument('--flk', type=str, required=False, help='xml c flk для обработки')
+    parser.add_argument('--exclude_ids', type=str, default='', help='id записей для исключения из SZPM или ATM файлов')
+
+    return parser
 
 
 if __name__ == '__main__':
@@ -259,7 +285,6 @@ if __name__ == '__main__':
         sys.exit()
     
     conf = Config()
-
 
     file_param = args.file
     if not file_param:
@@ -285,4 +310,19 @@ if __name__ == '__main__':
         prepare_szpm(file_path, conf, args.exclude_ids)
 
     elif file_path.name.lower().startswith('atm'):
-        prepare_atm(file_path, args.exclude_ids)
+        flk_file_param = args.flk
+        if not flk_file_param:
+            print('key "--flk" is required for porocessed ATM')
+            sys.exit()
+        if not flk_file_param:
+            flk_path = Path(flk_file_param)
+            if not flk_path.exists():
+                print(f'handling file not found in path "{flk_path}"')
+                sys.exit()
+
+            if flk_path.is_dir():
+                print(f'handling file not found, current path "{flk_path}" is directory.')
+                sys.exit()
+
+        atm_name_for_copy = prepare_atm(file_path, conf, flk_path=flk_path, extended_ids_for_exclude=args.exclude_ids)
+        print(atm_name_for_copy)

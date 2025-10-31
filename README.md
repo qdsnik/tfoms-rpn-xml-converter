@@ -16,9 +16,9 @@ python3 conv.py -inconf
 ```
 python3 conv.py --file <имя xml>.xml
 ```
-Для удаления записей при повторной обработке можно передать ключ `--exclude_ids`, пример:
+Для удаления записей при повторной обработке:
 ```
-python3 conv.py --file <имя xml>.xml --exclude_ids=1,5,7
+python3 conv.py --file ATM<имя>.xml --flk FATM<имя>.xml --exclude_ids=1,5,7
 ```
 
 ### Особенности использования:
