@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<FLK_P xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <ZGLV>
+    <FDATE>2025-10-28</FDATE>
+    <FNAME>FATM352530T35351_251028</FNAME>
+    <FNAME_I>ATM352530T35351_251028</FNAME_I>
+    <FLK_RES>3</FLK_RES>
+  </ZGLV>
+  <ERROR>
+    <CODE>1</CODE>
+    <MESSAGE>Пересекаются периоды прикрепления. Дата начала прикрепления = 27102025 меньше или равна дате существующего прикрепления = 27102025</MESSAGE>
+    <TAG>ATT\REC\DATE_ATTACH_B</TAG>
+    <N_ZAP>2</N_ZAP>
+  </ERROR>
+  <ERROR>
+    <CODE>1</CODE>
+    <MESSAGE>Пересекаются периоды прикрепления. Дата начала прикрепления = 28102025 меньше или равна дате существующего прикрепления = 28102025</MESSAGE>
+    <TAG>ATT\REC\DATE_ATTACH_B</TAG>
+    <N_ZAP>4</N_ZAP>
+  </ERROR>
+</FLK_P>

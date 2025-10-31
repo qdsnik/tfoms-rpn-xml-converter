@@ -11,9 +11,9 @@
 	</ZGLV>
 	<PERS>
 		<N_ZAP>1</N_ZAP>
-		<FAM>aaaa</FAM>
-		<IM>aaaa</IM>
-		<OT>aaaa</OT>
+		<FAM>тест1</FAM>
+		<IM>тест1</IM>
+		<OT>тест1</OT>
 		<W>1</W>
 		<DR>1993-08-11</DR>
 		<ENP>3551111111111111</ENP>
@@ -23,9 +23,9 @@
 	</PERS>
 	<PERS>
 		<N_ZAP>2</N_ZAP>
-		<FAM>bbbb</FAM>
-		<IM>bbbb</IM>
-		<OT>bbbb</OT>
+		<FAM>тест2</FAM>
+		<IM>тест2</IM>
+		<OT>тест2</OT>
 		<W>2</W>
 		<DR>2001-10-31</DR>
 		<ENP>3552222222222222</ENP>
@@ -35,9 +35,9 @@
 	</PERS>
 	<PERS>
 		<N_ZAP>3</N_ZAP>
-		<FAM>cccc</FAM>
-		<IM>cccc</IM>
-		<OT>cccc</OT>
+		<FAM>тест3</FAM>
+		<IM>тест3</IM>
+		<OT>тест3</OT>
 		<W>1</W>
 		<DR>2005-01-19</DR>
 		<ENP>3553333333333333</ENP>

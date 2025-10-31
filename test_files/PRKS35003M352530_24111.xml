@@ -11,9 +11,9 @@
 	</ZGLV>
 	<PERS>
 		<N_ZAP>1</N_ZAP>
-		<FAM>?</FAM>
-		<IM>?</IM>
-		<OT>?</OT>
+		<FAM>тест1</FAM>
+		<IM>тест1</IM>
+		<OT>тест1</OT>
 		<W>1</W>
 		<DR>1991-12-01</DR>
 		<DOCTYPE>14</DOCTYPE>
@@ -46,9 +46,9 @@
 	</PERS>
 	<PERS>
 		<N_ZAP>2</N_ZAP>
-		<FAM>?</FAM>
-		<IM>?</IM>
-		<OT>?</OT>
+		<FAM>тест2</FAM>
+		<IM>тест2</IM>
+		<OT>тест2</OT>
 		<W>1</W>
 		<DR>1991-01-01</DR>
 		<DOCTYPE>14</DOCTYPE>
