@@ -8,29 +8,56 @@ import sys
 from datetime import datetime
 
 
+DEFAULT_CONFIG = {
+    'month_packet_counter': {"2025-10": 0},
+    'code_lpu': '352530',  # Код МО из F032
+}
+CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
+
+
+def init_or_update_config() -> None:
+    if os.path.exists(CONFIG_PATH):
+        added_keys = []
+        with open(CONFIG_PATH, 'r') as f:
+            conf_data = json.load(f)
+            for key, value in DEFAULT_CONFIG.items():
+                if key not in conf_data:
+                    conf_data[key] = value
+                    added_keys.append(key)
+        if added_keys:
+            with open(CONFIG_PATH, 'w') as f:
+                json.dump(conf_data, f)
+            print(f'В файл конфигурациии добавлены ключи: {added_keys}\n')
+        else:
+            print(f'Файл конфигурациии не изменен.\n')
+    else:
+        with open(CONFIG_PATH, 'w') as f:
+            json.dump(DEFAULT_CONFIG, f)
+            print('Конфиг не найден, создан дефолтный.\n')
+
+
 class Config:
     def __init__(self):
-        
+
+        if not os.path.exists(CONFIG_PATH):
+            init_or_update_config()
+
         today = datetime.now()
         self.month_packet_counter_key = f"{today.year}-{today.month}"
-
-        self.config_default_path = os.path.join(os.getcwd(), 'conf.json')
-        if not os.path.exists(self.config_default_path):
-            with open(self.config_default_path, 'w') as f:
-                json.dump({'month_packet_counter': {self.month_packet_counter_key: 0}}, f)
-        
         self.conf_data = None
+        self.load()
+
+        # Проверяем актуальность счетчика относительно текущей даты, обновляем при необходимости.
+        if self.month_packet_counter_key not in self.conf_data:
+            self.conf_data['month_packet_counter'][self.month_packet_counter_key] = 0
+            self.save()
 
     def load(self):
-        with open(self.config_default_path, 'r') as f:
+        with open(CONFIG_PATH, 'r') as f:
             self.conf_data = json.load(f)
-        
-        # Инициализируем счетчик, при обновлении даты.
-        if self.month_packet_counter_key not in self.conf_data['month_packet_counter']:
-            self.conf_data['month_packet_counter'][self.month_packet_counter_key] = 0
 
     def save(self):
-        with open(self.config_default_path, 'w') as f:
+        with open(CONFIG_PATH, 'w') as f:
             json.dump(self.conf_data, f)
 
     def inc_month_counter(self):
@@ -46,16 +73,21 @@ class Config:
         return self.conf_data['month_packet_counter'][self.month_packet_counter_key]
 
 
-# Код МО из F032
-CODE_MO = '352530'
-
-
 def init() -> argparse.ArgumentParser:
     """Возвращает объект для разбора входных параметров."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('file', type=str, help='xml file for handling')
-    parser.add_argument('--exclude_ids', type=str, default='', help='id records for exclude')
+    parser.add_argument(
+        '-inconf',
+        '--init_config',
+        action='store_true',
+        help=(
+            'Инициализировать файл конфигурации, чтобы изменить настройки перед первым использованием. '
+            'Если файл конфигурации уже существует, добавит только новые ключи.'
+        )
+    )
+    parser.add_argument('-f', '--file', type=str, required=False, help='xml для обработки')
+    parser.add_argument('--exclude_ids', type=str, default='', help='id записей для исключения из SZPM или ATM файлов')
 
     return parser
 
@@ -121,7 +153,8 @@ def prepare_ozps(file_path: Path):
 def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
     today = datetime.now()
-    new_file_name = f'ATM{CODE_MO}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+    code_lpu = config['code_lpu']
+    new_file_name = f'ATM{code_lpu}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
 
     tree = etree.parse(str(file_path))
     root = tree.getroot()
@@ -200,7 +233,6 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
 
 def prepare_atm(file_path: Path, ids_for_exclude=None):
     """Изменяет файл atm файл для прикрепления по терапевтическому профилю."""
-
     if not ids_for_exclude:
         return
 
@@ -221,10 +253,20 @@ def prepare_atm(file_path: Path, ids_for_exclude=None):
 if __name__ == '__main__':
     parser = init()
     args = parser.parse_args()
-    file_path = Path(args.file)
 
+    if args.init_config:
+        init_or_update_config()
+        sys.exit()
+    
     conf = Config()
 
+
+    file_param = args.file
+    if not file_param:
+        print('key "--file" is required for using conv')
+        sys.exit()
+    
+    file_path = Path(file_param)
     if not file_path.exists():
         print(f'handling file not found in path "{file_path}"')
         sys.exit()
