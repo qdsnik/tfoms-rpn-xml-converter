@@ -8,12 +8,17 @@ update 26.10.2025: доработка с учетом изменений в ре
 http://new.oms35.ru/upload/Inf_MO_i_SMO/Informazion_vzaim/Reglament_030925.pdf
 
 ### Примеры использования:
+Для инициализации файла конфигурации, если требуется внести какие-то изменения:
 ```
-python3 conv.py <имя xml>.xml
+python3 conv.py -inconf
+```
+Для запуска конвертации:
+```
+python3 conv.py --file <имя xml>.xml
 ```
 Для удаления записей при повторной обработке можно передать ключ `--exclude_ids`, пример:
 ```
-    python3 conv.py <имя xml>.xml --exclude_ids=1,5,7
+python3 conv.py --file <имя xml>.xml --exclude_ids=1,5,7
 ```
 
 ### Особенности использования:
