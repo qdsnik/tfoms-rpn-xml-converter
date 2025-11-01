@@ -14,11 +14,11 @@ python3 conv.py -inconf
 ```
 Для запуска конвертации:
 ```
-python3 conv.py --file <имя xml>.xml
+python3 conv.py --file=<путь до xml>/<имя xml>.xml
 ```
 Для удаления записей при повторной обработке:
 ```
-python3 conv.py --file ATM<имя>.xml --flk FATM<имя>.xml --exclude_ids=1,5,7
+python3 conv.py --file=<путь до xml>//ATM<имя>.xml --flk=<путь до xml>//FATM<имя>.xml --exclude_ids=1,5,7
 ```
 
 ### Особенности использования:
