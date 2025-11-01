@@ -137,7 +137,7 @@ def prepare_ozps(file_path: Path):
 def get_new_atm_name(config: Config) -> str:
     """Возвращает имя ATM файла с новым номером пакета."""
     today = datetime.now()
-    code_lpu = config['code_lpu']
+    code_lpu = config.conf_data['code_lpu']
     return f'ATM{code_lpu}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
 
 
@@ -249,7 +249,7 @@ def prepare_atm(file_path: Path, conf: Config, *, flk_path: Path, extended_ids_f
     for item in pers_for_remove:
         root.remove(item)
     
-    if conf['allow_save_atm_to_new_package']:
+    if conf.conf_data['allow_save_atm_to_new_package']:
         new_file_name = get_new_atm_name(conf)
         return save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     
