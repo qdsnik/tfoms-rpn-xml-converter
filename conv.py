@@ -182,14 +182,6 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     tree = etree.parse(str(file_path))
     root = tree.getroot()
 
-    # --- читаем CODE_MO из входного SZPM ---
-    zglv = root.find("ZGLV")
-    code_mo_tag = zglv.find("CODE_MO")
-    if code_mo_tag is not None and code_mo_tag.text:
-        config.conf_data['code_lpu'] = code_mo_tag.text.strip()
-        config.save()
-    else:
-        print("[WARNING] CODE_MO не найден, используется значение из config")
 
     # теперь, когда code_lpu обновлён, создаем имена файлов
     new_file_name = get_new_atm_name(config, file_type = 1)
