@@ -7,26 +7,27 @@ import argparse
 import sys
 from datetime import datetime
 
-FAP_OIDS = {
-    "1.2.643.5.1.13.13.12.2.35.3294.0.999999",
-    "1.2.643.5.1.13.13.12.2.35.3294.0.888888",
-}
 
 DEFAULT_CONFIG = {
     'month_packet_counter': {"2025-10": 0},
     'code_lpu': '352530',  # Код МО из F032
     'allow_save_atm_to_new_package': True,
+    'fap_oids': [
+        "1.2.643.5.1.13.13.12.2.35.3294.0.999999",  #меняем на ОИДы СП фапов
+        "1.2.643.5.1.13.13.12.2.35.3294.0.888888"
+    ]
 }
 CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
 
 
-def indent(elem, level=0):
+def set_indent(elem, level=0):
+    """Рекурсивно добавляет отступы для выравнивания в тексте xml-разметки.""" 
     i = "\n" + level * "\t"
     if len(elem):
         if not elem.text or not elem.text.strip():
             elem.text = i + "\t"
         for e in elem:
-            indent(e, level+1)
+            set_indent(e, level + 1)
         if not e.tail or not e.tail.strip():
             e.tail = i
     else:
@@ -152,20 +153,32 @@ def prepare_ozps(file_path: Path):
     print('Done.')
 
 
-def get_new_atm_name(config: Config) -> str:
-    """Возвращает имя ATM файла с новым номером пакета."""
-    today = datetime.now()
-    code_lpu = config.conf_data['code_lpu']
-    return f'ATM{code_lpu}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+def get_new_atm_name(config: Config, file_type: int = 1) -> str:
+    """
+    Возвращает имя ATM файла с новым номером пакета.
 
-def get_fap_atm_name(config: Config) -> str:
-    """Возвращает имя ATM файла с новым номером пакета."""
+    :param config: объект настроек
+    :param file_type: тип файла:
+        1 — терапевтическое прикрепление (T35351)
+        2 — ФАП-прикрепление (T35355)
+        Можно далее расширять при появлении новых типов.
+    """
     today = datetime.now()
     code_lpu = config.conf_data['code_lpu']
-    return f'ATM{code_lpu}T35355_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+    
+    # Типы файлов
+    type_suffix = {
+        1: "T35351",  # терапевтическое прикрепление
+        2: "T35355",  # ФАП прикрепление
+        3: "T35001",  # Иногородние терапевтическое прикрепление
+        4: "T35005",  # Иногородние ФАП прикрепление
+    }
+    suffix = type_suffix[file_type]
+    return f'ATM{code_lpu}{suffix}_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
 
 
 def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
+    """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
     tree = etree.parse(str(file_path))
     root = tree.getroot()
 
@@ -179,20 +192,19 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         print("[WARNING] CODE_MO не найден, используется значение из config")
 
     # теперь, когда code_lpu обновлён, создаем имена файлов
-    new_file_name = get_new_atm_name(config)
-    fap_file_name = get_fap_atm_name(config)
+    new_file_name = get_new_atm_name(config, file_type = 1)
+    fap_file_name = get_new_atm_name(config, file_type = 2)
 
     tree = etree.parse(str(file_path))
     root = tree.getroot()
 
     # Сначала соберём id записей, которые подходят по MO_DEP_ID (до любых изменений)
     selected_ids = []
+    fap_oids = set(config.conf_data.get("fap_oids", []))
     for pers in root.findall('PERS'):
         mo_dep = pers.find('MO_DEP_ID')
-        if mo_dep is not None and mo_dep.text in FAP_OIDS:
-            n_zap = pers.find('N_ZAP')
-            if n_zap is not None and n_zap.text:
-                selected_ids.append(n_zap.text)
+        if mo_dep is not None and mo_dep.text in fap_oids:
+            selected_ids.append(pers.find('N_ZAP').text)
 
     # Теперь выполняем преобразование SZPM -> ATT (как раньше)
     root.tag = 'ATT'
@@ -218,7 +230,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     pers_for_remove = []
 
     # Перебираем PERS и делаем из них REC, одновременно очищая поля
-    for pers in list(root.findall('PERS')):  # list() чтобы можно было удалять элементы
+    for pers in root.findall('PERS'):
         doc_code_tag = pers.find('DOC_CODE')
         # Проверяем, чтобы к пациенту был закреплен медик,
         # иначе удаляем из обработки такие заявления.
@@ -236,20 +248,26 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         enp_tag = pers.find('NPOLIS')
         if enp_tag is not None:
             enp_tag.tag = 'ENP'
+        else:
+            pers_for_remove.append(pers)
+            
 
         datez_tag = pers.find('DATEZ')
         if datez_tag is not None:
             datez_tag.tag = 'DATE_ATTACH_B'
+        else:
+            pers_for_remove.append(pers)
 
         prz_tag = pers.find('PRZ')
         if prz_tag is not None:
             prz_tag.tag = 'ATTACH_METHOD'
             prz_tag.text = '2'
+        else:
+            pers_for_remove.append(pers)
 
         # Убрать все разделители.
         doc_code_tag = pers.find('DOC_CODE')
-        if doc_code_tag is not None and doc_code_tag.text:
-            doc_code_tag.text = doc_code_tag.text.replace('-', '').replace(' ', '')
+        doc_code_tag.text = doc_code_tag.text.replace('-', '').replace(' ', '')
 
     # Удаляем неподходящие данные.
     for item in pers_for_remove:
@@ -259,8 +277,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     if ids_for_exclude:
         pers_for_remove = []
         for pers in root.findall('REC'):
-            n = pers.find('N_ZAP')
-            if n is not None and n.text in ids_for_exclude.split(','):
+            if pers.find('N_ZAP').text in ids_for_exclude.split(','):
                 pers_for_remove.append(pers)
 
         for item in pers_for_remove:
@@ -299,7 +316,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         selected_name = f"{fap_file_name}.xml"
         selected_path = selected_dir / selected_name
 
-        indent(selected_root)
+        set_indent(selected_root)
         
         with open(selected_path, "w", encoding='cp1251', newline='\r\n') as f:
             f.write(
@@ -314,7 +331,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         print(f"[INFO] Создан FAP файл: {selected_name}")
 
     # Сохраняем основной (все записи) результат
-    indent(root)
+    set_indent(root)
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
 
