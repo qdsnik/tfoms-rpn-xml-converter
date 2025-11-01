@@ -12,10 +12,7 @@ DEFAULT_CONFIG = {
     'month_packet_counter': {"2025-10": 0},
     'code_lpu': '352530',  # Код МО из F032
     'allow_save_atm_to_new_package': True,
-    'fap_oids': [
-        "1.2.643.5.1.13.13.12.2.35.3294.0.999999",  #меняем на ОИДы СП фапов
-        "1.2.643.5.1.13.13.12.2.35.3294.0.888888"
-    ]
+    'fap_oids': []
 }
 CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
 
@@ -78,6 +75,14 @@ class Config:
         return self.conf_data['month_packet_counter'][self.month_packet_counter_key]
 
 
+class ATMType:
+    """Тип документа."""
+    TERAPEVTS_ATTACHMENT = 'T35351'
+    TERAPEVTS_OUT_OFF_TOWN_ATTACHMENT = 'T35001'
+    FAP_ATTACHMENT = 'T35355'
+    FAP_OUT_OFF_TOWN_ATTACHMENT = 'T35005'
+
+
 def remove_node(parent, name):
     """Удаляет из указанного родителя тег с переданным именем."""
     node_for_remove = parent.find(name)
@@ -138,7 +143,7 @@ def prepare_ozps(file_path: Path):
     print('Done.')
 
 
-def get_new_atm_name(config: Config, file_type: int = 1) -> str:
+def get_new_atm_name(config: Config, file_type: int = ATMType.TERAPEVTS_ATTACHMENT) -> str:
     """
     Возвращает имя ATM файла с новым номером пакета.
 
@@ -150,16 +155,8 @@ def get_new_atm_name(config: Config, file_type: int = 1) -> str:
     """
     today = datetime.now()
     code_lpu = config.conf_data['code_lpu']
-    
-    # Типы файлов
-    type_suffix = {
-        1: "T35351",  # терапевтическое прикрепление
-        2: "T35355",  # ФАП прикрепление
-        3: "T35001",  # Иногородние терапевтическое прикрепление
-        4: "T35005",  # Иногородние ФАП прикрепление
-    }
-    suffix = type_suffix[file_type]
-    return f'ATM{code_lpu}{suffix}_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+
+    return f'ATM{code_lpu}{file_type}_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
 
 
 def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
@@ -167,10 +164,9 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     tree = etree.parse(str(file_path))
     root = tree.getroot()
 
-
     # теперь, когда code_lpu обновлён, создаем имена файлов
-    new_file_name = get_new_atm_name(config, file_type = 1)
-    fap_file_name = get_new_atm_name(config, file_type = 2)
+    new_file_name = get_new_atm_name(config)
+    fap_file_name = get_new_atm_name(config, file_type = ATMType.FAP_ATTACHMENT)
 
     # Сначала соберём id записей, которые подходят по MO_DEP_ID (до любых изменений)
     selected_ids = []
