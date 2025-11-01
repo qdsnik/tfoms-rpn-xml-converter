@@ -12,6 +12,10 @@ DEFAULT_CONFIG = {
     'month_packet_counter': {"2025-10": 0},
     'code_lpu': '352530',  # Код МО из F032
     'allow_save_atm_to_new_package': True,
+    'fap_oids': [
+        "1.2.643.5.1.13.13.12.2.35.3294.0.999999",  #меняем на ОИДы СП фапов
+        "1.2.643.5.1.13.13.12.2.35.3294.0.888888"
+    ]
 }
 CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
 
@@ -134,20 +138,49 @@ def prepare_ozps(file_path: Path):
     print('Done.')
 
 
-def get_new_atm_name(config: Config) -> str:
-    """Возвращает имя ATM файла с новым номером пакета."""
+def get_new_atm_name(config: Config, file_type: int = 1) -> str:
+    """
+    Возвращает имя ATM файла с новым номером пакета.
+
+    :param config: объект настроек
+    :param file_type: тип файла:
+        1 — терапевтическое прикрепление (T35351)
+        2 — ФАП-прикрепление (T35355)
+        Можно далее расширять при появлении новых типов.
+    """
     today = datetime.now()
     code_lpu = config.conf_data['code_lpu']
-    return f'ATM{code_lpu}T35351_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
+    
+    # Типы файлов
+    type_suffix = {
+        1: "T35351",  # терапевтическое прикрепление
+        2: "T35355",  # ФАП прикрепление
+        3: "T35001",  # Иногородние терапевтическое прикрепление
+        4: "T35005",  # Иногородние ФАП прикрепление
+    }
+    suffix = type_suffix[file_type]
+    return f'ATM{code_lpu}{suffix}_{str(today.year)[2:]}{str(today.month).zfill(2)}{str(config.inc_month_counter()).zfill(3)}'
 
 
 def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
-    new_file_name = get_new_atm_name(config)
-
     tree = etree.parse(str(file_path))
     root = tree.getroot()
-    
+
+
+    # теперь, когда code_lpu обновлён, создаем имена файлов
+    new_file_name = get_new_atm_name(config, file_type = 1)
+    fap_file_name = get_new_atm_name(config, file_type = 2)
+
+    # Сначала соберём id записей, которые подходят по MO_DEP_ID (до любых изменений)
+    selected_ids = []
+    fap_oids = set(config.conf_data.get("fap_oids", []))
+    for pers in root.findall('PERS'):
+        mo_dep = pers.find('MO_DEP_ID')
+        if mo_dep is not None and mo_dep.text in fap_oids:
+            selected_ids.append(pers.find('N_ZAP').text)
+
+    # Теперь выполняем преобразование SZPM -> ATT (как раньше)
     root.tag = 'ATT'
 
     zglv_tag = root.find('ZGLV')
@@ -162,60 +195,119 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
 
     for tag_name in ('YEAR', 'MONTH', 'ZAP'):
         removing_tag = zglv_tag.find(tag_name)
-        if removing_tag != None:
+        if removing_tag is not None:
             zglv_tag.remove(removing_tag)
 
     etree.SubElement(zglv_tag, 'AREA_TYPE').text = '1'
+    zglv_tag.tail = "\n"
 
     pers_for_remove = []
+
+    # Перебираем PERS и делаем из них REC, одновременно очищая поля
     for pers in root.findall('PERS'):
-        
         doc_code_tag = pers.find('DOC_CODE')
         # Проверяем, чтобы к пациенту был закреплен медик,
         # иначе удаляем из обработки такие заявления.
         if doc_code_tag is None:
             pers_for_remove.append(pers)
             continue
-        
+
         pers.tag = 'REC'
 
         for tag_name in ('PR_NOV', 'ID_PAC', 'DOCSER', 'DOCNUM', 'VPOLIS', 'SMO', 'DOC_POST'):
             removing_tag = pers.find(tag_name)
-            if removing_tag != None:
+            if removing_tag is not None:
                 pers.remove(removing_tag)
-        
+
         enp_tag = pers.find('NPOLIS')
-        enp_tag.tag = 'ENP'
+        if enp_tag is not None:
+            enp_tag.tag = 'ENP'
+        else:
+            pers_for_remove.append(pers)
+            continue
 
         datez_tag = pers.find('DATEZ')
-        datez_tag.tag = 'DATE_ATTACH_B'
+        if datez_tag is not None:
+            datez_tag.tag = 'DATE_ATTACH_B'
+        else:
+            pers_for_remove.append(pers)
+            continue
 
         prz_tag = pers.find('PRZ')
-        prz_tag.tag = 'ATTACH_METHOD'
-        prz_tag.text = '2'
+        if prz_tag is not None:
+            prz_tag.tag = 'ATTACH_METHOD'
+            prz_tag.text = '2'
+        else:
+            pers_for_remove.append(pers)
+            continue
 
         # Убрать все разделители.
         doc_code_tag = pers.find('DOC_CODE')
-        if doc_code_tag != None:
-            doc_code_tag.text = doc_code_tag.text.replace('-', '').replace(' ', '')
-
-        # Согласно спецификации должен указываться, но поле опциональное.
-        # etree.SubElement(pers, 'DOC_ID').text = ''
+        doc_code_tag.text = doc_code_tag.text.replace('-', '').replace(' ', '')
 
     # Удаляем неподходящие данные.
     for item in pers_for_remove:
         root.remove(item)
 
-    # Удаляем исключенные записи.
+    # Удаляем исключенные записи из аргумента ids_for_exclude
     if ids_for_exclude:
         pers_for_remove = []
-        for pers in root.findall('REC'):        
-            if pers.find('N_ZAP').text in ids_for_exclude.split(','): 
+        for pers in root.findall('REC'):
+            if pers.find('N_ZAP').text in ids_for_exclude.split(','):
                 pers_for_remove.append(pers)
 
         for item in pers_for_remove:
             root.remove(item)
 
+    # ---- Создание второго файла: берем уже ОЧИЩЕННЫЕ REC по selected_ids ----
+    if selected_ids:
+        selected_root = etree.Element("ATT")
+
+        # копируем изменённый ZGLV
+        selected_zglv = etree.fromstring(etree.tostring(zglv_tag))
+        fname_tag = selected_zglv.find('FNAME')
+        if fname_tag is not None:
+            fname_tag.text = fap_file_name
+
+        # заменить AREA_TYPE на 3 (убрать прежний, если есть)
+        old_area = selected_zglv.find('AREA_TYPE')
+        if old_area is not None:
+            selected_zglv.remove(old_area)
+        etree.SubElement(selected_zglv, "AREA_TYPE").text = "3"
+
+        selected_root.append(selected_zglv)
+        selected_zglv.tail = "\n\t"
+
+        # добавляем только нужные REC (уже очищенные)
+        for rec in root.findall('REC'):
+            n = rec.find('N_ZAP')
+            if n is not None and n.text in selected_ids:
+                # добавляем копию узла
+                selected_root.append(etree.fromstring(etree.tostring(rec)))
+
+        # папка и имя для второго файла
+        selected_dir = Path(file_path.parent) / 'converted'
+        selected_dir.mkdir(exist_ok=True)
+
+        selected_name = f"{fap_file_name}.xml"
+        selected_path = selected_dir / selected_name
+
+        etree.indent(selected_root, space="\t")
+        
+        with open(selected_path, "w", encoding='cp1251', newline='\r\n') as f:
+            f.write(
+                etree.tostring(
+                    selected_root,
+                    pretty_print=True,
+                    encoding="Windows-1251",
+                    xml_declaration=True
+                ).decode("cp1251")
+            )
+
+        print(f"[INFO] Создан FAP файл: {selected_name}")
+
+    # Сохраняем основной (все записи) результат
+    etree.indent(root, space="\t")
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
 
