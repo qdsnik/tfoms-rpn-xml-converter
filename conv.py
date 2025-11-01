@@ -20,21 +20,6 @@ DEFAULT_CONFIG = {
 CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
 
 
-def set_indent(elem, level=0):
-    """Рекурсивно добавляет отступы для выравнивания в тексте xml-разметки.""" 
-    i = "\n" + level * "\t"
-    if len(elem):
-        if not elem.text or not elem.text.strip():
-            elem.text = i + "\t"
-        for e in elem:
-            set_indent(e, level + 1)
-        if not e.tail or not e.tail.strip():
-            e.tail = i
-    else:
-        if level and (not elem.tail or not elem.tail.strip()):
-            elem.tail = i
-
-
 def init_or_update_config() -> None:
     if os.path.exists(CONFIG_PATH):
         added_keys = []
@@ -307,7 +292,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         selected_name = f"{fap_file_name}.xml"
         selected_path = selected_dir / selected_name
 
-        set_indent(selected_root)
+        etree.indent(selected_root, space="\t")
         
         with open(selected_path, "w", encoding='cp1251', newline='\r\n') as f:
             f.write(
@@ -322,7 +307,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         print(f"[INFO] Создан FAP файл: {selected_name}")
 
     # Сохраняем основной (все записи) результат
-    set_indent(root)
+    etree.indent(root, space="\t")
     save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print('Done.')
 
