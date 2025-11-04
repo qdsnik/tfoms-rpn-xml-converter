@@ -171,6 +171,26 @@ def get_fap_record_ids(root_node, config: Config) -> list[str]:
     return selected_ids
 
 
+def create_atm_by_copying(parent_root, record_numbers, atm_type, config, *, area_type: str = None) -> str:
+    """Создает новый файл копированием."""    
+    file_name = get_new_atm_name(config, file_type = atm_type)
+    
+    root = etree.Element("ATT")
+    zglv_tag = parent_root.find('ZGLV')
+    new_zglv = etree.fromstring(etree.tostring(zglv_tag))
+    new_zglv.find('FNAME').text = file_name
+    if area_type:
+        new_zglv.find('AREA_TYPE').text = area_type
+    root.append(new_zglv)
+    root.extend(
+        [rec for rec in parent_root.findall('REC') if rec.find('N_ZAP').text in record_numbers]
+    )
+    etree.indent(root, space="\t")
+    filename = save_result(root, file_path, new_file_name=f'{file_name}.xml')
+
+    return filename
+
+
 def prepare_att_header(root, filename):
     """Возвращает подготовленный заголовок ATT."""
     zglv_tag = root.find('ZGLV')
@@ -263,7 +283,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     filename = save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
     print("[INFO] Создан TER файл: %s" % filename)
 
-    # Создание варианта ATT для ФАП-ов.
+    # Создание варианта ATM для ФАП-ов.
     fap_file_name = get_new_atm_name(config, file_type = ATMType.FAP_ATTACHMENT)
     if record_ids_for_fap:
         fap_root = etree.Element("ATT")
@@ -279,40 +299,81 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
     print('Done.')
 
 
-def prepare_atm(file_path: Path, conf: Config, *, flk_path: Path, extended_ids_for_exclude=None) -> str:
+def check_out_of_town_in_flk(tag_message: str) -> bool:
+    """Возвращает True о наличии ошибок на иногородных."""
+    return 'ЗЛ застрахованно за пределами' in tag_message
+
+
+def prepare_atm(atm_file_path: Path, conf: Config, *, flk_path: Path, extended_ids_for_exclude=None) -> str:
     """Исправляет файл atm исключением дефектных строк из ФЛК."""
+    atm_tree = etree.parse(str(atm_file_path))
+    atm_root = atm_tree.getroot()
+
     ids_for_exclude = []
+
     if flk_path:
         flk_tree = etree.parse(str(flk_path))
         flk_root = flk_tree.getroot()
         flk_result = flk_root.find('ZGLV').find('FLK_RES').text
 
-        if int(flk_result) == 0:
+        handling_filename = flk_root.find('ZGLV').find('FNAME_I').text
+        if f'{handling_filename}.xml'.lower() != atm_file_path.name.lower():
+            raise RuntimeError('Файл flk не подходит для обрабатываемого файла atm')
+
+        if int(flk_result) == '0':
             return ''
-    
-        ids_for_exclude = [x.find('N_ZAP').text for x in flk_root.findall('ERROR')]
+
+        # Обработка flk для терапевтического atm.
+        # Исходя из модержимого flk часть данных может быть выделена в файл с иногородними.
+        ids_for_out_of_town_ter = []
+        ids_for_out_of_town_fap = []
+        if ATMType.TERAPEVTS_ATTACHMENT in atm_file_path.name:
+            for tag in flk_root.findall('ERROR'):
+                if check_out_of_town_in_flk(tag.find('MESSAGE').text):
+                    ids_for_out_of_town_ter.append(tag.find('N_ZAP').text)
+                else:
+                    ids_for_exclude.append(tag.find('N_ZAP').text)
+        
+        elif ATMType.FAP_ATTACHMENT in atm_file_path.name:
+            for tag in flk_root.findall('ERROR'):
+                if check_out_of_town_in_flk(tag.find('MESSAGE')):
+                    ids_for_out_of_town_fap.append(tag.find('N_ZAP').text)
+                else:
+                    ids_for_exclude.append(tag.find('N_ZAP').text)
     
     if extended_ids_for_exclude:
         ids_for_exclude.extend(extended_ids_for_exclude.split(','))
 
-    if not ids_for_exclude:
-        raise RuntimeError('Нет данных для обрабоки ATM')
+    # Файл с иногородними из терапевтичского.
+    if ids_for_out_of_town_ter:
+        out_of_town_file_name_ter = create_atm_by_copying(atm_root, ids_for_out_of_town_ter, ATMType.TERAPEVTS_OUT_OFF_TOWN_ATTACHMENT, conf)
+        ids_for_exclude.extend(ids_for_out_of_town_ter)
+        print("[INFO] Создан файл: %s" % out_of_town_file_name_ter)
 
-    tree = etree.parse(str(file_path))
-    root = tree.getroot()
-    pers_for_remove = []
-    for pers in root.findall('REC'):        
-        if pers.find('N_ZAP').text in ids_for_exclude: 
-            pers_for_remove.append(pers)
+    # Файл с иногородними из фап.
+    if ids_for_out_of_town_fap:
+        out_of_town_file_name_fap = create_atm_by_copying(atm_root, ids_for_out_of_town_ter, ATMType.FAP_OUT_OFF_TOWN_ATTACHMENT, conf)
+        ids_for_exclude.extend(ids_for_out_of_town_fap)
+        print("[INFO] Создан файл: %s" % out_of_town_file_name_fap)
 
-    for item in pers_for_remove:
-        root.remove(item)
-    
+    if ids_for_exclude:
+        pers_for_remove = []
+        for pers in atm_root.findall('REC'):
+            if pers.find('N_ZAP').text in ids_for_exclude:
+                pers_for_remove.append(pers)
+
+        for item in pers_for_remove:
+            atm_root.remove(item)
+
     if conf.conf_data['allow_save_atm_to_new_package']:
         new_file_name = get_new_atm_name(conf)
-        return save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
-    
-    return save_result(root, file_path)
+        updated_file = save_result(atm_root, file_path, new_file_name=f'{new_file_name}.xml')
+        print("[INFO] Создан файл: %s" % updated_file)
+        return updated_file
+
+    updated_file = save_result(atm_root, file_path)
+    print("[INFO] Создан файл: %s" % updated_file)
+    return updated_file
 
 
 def init() -> argparse.ArgumentParser:
@@ -373,7 +434,9 @@ if __name__ == '__main__':
         if not flk_file_param:
             print('key "--flk" is required for porocessed ATM')
             sys.exit()
-        if not flk_file_param:
+
+        flk_path = None
+        if flk_file_param:
             flk_path = Path(flk_file_param)
             if not flk_path.exists():
                 print(f'handling file not found in path "{flk_path}"')
@@ -383,5 +446,4 @@ if __name__ == '__main__':
                 print(f'handling file not found, current path "{flk_path}" is directory.')
                 sys.exit()
 
-        atm_name_for_copy = prepare_atm(file_path, conf, flk_path=flk_path, extended_ids_for_exclude=args.exclude_ids)
-        print(atm_name_for_copy)
+        prepare_atm(file_path, conf, flk_path=flk_path, extended_ids_for_exclude=args.exclude_ids)
