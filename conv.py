@@ -18,6 +18,7 @@ CONFIG_PATH = os.path.join(os.getcwd(), 'conf.json')
 
 
 def init_or_update_config() -> None:
+    """Инициализирует или дополняет параметрами файл конфигурации."""
     if os.path.exists(CONFIG_PATH):
         added_keys = []
         with open(CONFIG_PATH, 'r') as f:
@@ -50,7 +51,7 @@ class Config:
         self.load()
 
         # Проверяем актуальность счетчика относительно текущей даты, обновляем при необходимости.
-        if self.month_packet_counter_key not in self.conf_data:
+        if self.month_packet_counter_key not in self.conf_data['month_packet_counter']:
             self.conf_data['month_packet_counter'][self.month_packet_counter_key] = 0
             self.save()
 
