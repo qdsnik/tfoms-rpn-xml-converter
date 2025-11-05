@@ -1,7 +1,9 @@
 from __future__ import annotations
+import io
 import json
 import os
 from pathlib import Path
+import zipfile
 from lxml import etree
 import argparse
 import sys
@@ -91,17 +93,32 @@ def remove_node(parent, name):
         parent.remove(node_for_remove)
 
 
-def save_result(dom, src_file_path: Path, *, new_file_name: str = None) -> str:
+def save_as_zip(dst_file_name: str, dst_file_data: str, dst_zip_filename: str, dst_path: str) -> str:
+    """Сохраняет преобразованный файл внутри zip архива."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=7) as zf:
+        zf.writestr(dst_file_name, dst_file_data)
+    zip_buffer.seek(0)
+    with open(str(dst_path / dst_zip_filename), 'wb') as f:
+        f.write(zip_buffer.getvalue())
+
+
+def save_result(dom, src_file_path: Path, *, new_file_name: str = None, is_need_zip = False) -> str:
     """Возвращает имя файла, сохраняет результат обработки рядом с исходным файлом в каталоге `converted`."""
     dst_path = Path(src_file_path.parent) / 'converted'
     if not dst_path.exists():
         dst_path.mkdir()
-    dst_file_path = str(dst_path / (new_file_name or src_file_path.name))
-    f = open(dst_file_path, "w", encoding='cp1251', errors=None, newline='\r\n')
-    f.write(etree.tostring(dom, pretty_print=True, encoding='Windows-1251', xml_declaration=True).decode('cp1251'))
-    f.close()
+    
+    dst_filename = new_file_name or src_file_path.name
+    dst_file_data_as_str = etree.tostring(dom, pretty_print=True, encoding='Windows-1251', xml_declaration=True).decode('cp1251')
+    if is_need_zip:
+        dst_filename = dst_zip_filename = dst_filename.replace('.xml', '.zip')
+        save_as_zip(dst_filename, dst_file_data_as_str, dst_zip_filename, dst_path)
+    else:
+        with open(str(dst_path / dst_filename), "w", encoding='cp1251', errors=None, newline='\r\n') as f:
+            f.write(dst_file_data_as_str)
 
-    return (new_file_name or src_file_path.name)
+    return dst_filename
 
 
 def prepare_prks(file_path: Path):
@@ -172,7 +189,7 @@ def get_fap_record_ids(root_node, config: Config) -> list[str]:
     return selected_ids
 
 
-def create_atm_by_copying(parent_root, record_numbers, atm_type, config, *, area_type: str = None) -> str:
+def create_atm_by_copying(parent_root, record_numbers, atm_type, config, *, area_type: str = None, is_need_zip=False) -> str:
     """Создает новый файл копированием."""    
     file_name = get_new_atm_name(config, file_type = atm_type)
     
@@ -187,7 +204,7 @@ def create_atm_by_copying(parent_root, record_numbers, atm_type, config, *, area
         [rec for rec in parent_root.findall('REC') if rec.find('N_ZAP').text in record_numbers]
     )
     etree.indent(root, space="\t")
-    filename = save_result(root, file_path, new_file_name=f'{file_name}.xml')
+    filename = save_result(root, file_path, new_file_name=f'{file_name}.xml', is_need_zip=is_need_zip)
 
     return filename
 
@@ -214,7 +231,7 @@ def prepare_att_header(root, filename):
     return zglv_tag
 
 
-def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
+def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None, is_need_zip=False):
     """Преобразует и сохраняет измененный файл szpm в файл для прикрепления по терапевтическому профилю."""
     tree = etree.parse(str(file_path))
     root = tree.getroot()
@@ -281,7 +298,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
             root.remove(item)
 
     etree.indent(root, space="\t")
-    filename = save_result(root, file_path, new_file_name=f'{new_file_name}.xml')
+    filename = save_result(root, file_path, new_file_name=f'{new_file_name}.xml', is_need_zip=is_need_zip)
     print("[INFO] Создан TER файл: %s" % filename)
 
     # Создание варианта ATM для ФАП-ов.
@@ -294,7 +311,7 @@ def prepare_szpm(file_path: Path, config: Config, ids_for_exclude=None):
         fap_root.append(selected_zglv)
         fap_root.extend([rec for rec in root.findall('REC') if rec.find('N_ZAP').text in record_ids_for_fap])
         etree.indent(fap_root, space="\t")
-        filename = save_result(fap_root, file_path, new_file_name=f'{fap_file_name}.xml')
+        filename = save_result(fap_root, file_path, new_file_name=f'{fap_file_name}.xml', is_need_zip=is_need_zip)
         print("[INFO] Создан FAP файл: %s" % filename)
 
     print('Done.')
@@ -305,7 +322,7 @@ def check_out_of_town_in_flk(tag_message: str) -> bool:
     return 'ЗЛ застрахованно за пределами' in tag_message
 
 
-def prepare_atm(atm_file_path: Path, conf: Config, *, flk_path: Path, extended_ids_for_exclude=None) -> str:
+def prepare_atm(atm_file_path: Path, conf: Config, *, flk_path: Path, extended_ids_for_exclude=None, is_need_zip=False) -> str:
     """Исправляет файл atm исключением дефектных строк из ФЛК."""
     atm_tree = etree.parse(str(atm_file_path))
     atm_root = atm_tree.getroot()
@@ -347,13 +364,13 @@ def prepare_atm(atm_file_path: Path, conf: Config, *, flk_path: Path, extended_i
 
     # Файл с иногородними из терапевтичского.
     if ids_for_out_of_town_ter:
-        out_of_town_file_name_ter = create_atm_by_copying(atm_root, ids_for_out_of_town_ter, ATMType.TERAPEVTS_OUT_OFF_TOWN_ATTACHMENT, conf)
+        out_of_town_file_name_ter = create_atm_by_copying(atm_root, ids_for_out_of_town_ter, ATMType.TERAPEVTS_OUT_OFF_TOWN_ATTACHMENT, conf, is_need_zip=is_need_zip)
         ids_for_exclude.extend(ids_for_out_of_town_ter)
         print("[INFO] Создан файл: %s" % out_of_town_file_name_ter)
 
     # Файл с иногородними из фап.
     if ids_for_out_of_town_fap:
-        out_of_town_file_name_fap = create_atm_by_copying(atm_root, ids_for_out_of_town_ter, ATMType.FAP_OUT_OFF_TOWN_ATTACHMENT, conf)
+        out_of_town_file_name_fap = create_atm_by_copying(atm_root, ids_for_out_of_town_ter, ATMType.FAP_OUT_OFF_TOWN_ATTACHMENT, conf, is_need_zip=is_need_zip)
         ids_for_exclude.extend(ids_for_out_of_town_fap)
         print("[INFO] Создан файл: %s" % out_of_town_file_name_fap)
 
@@ -368,7 +385,7 @@ def prepare_atm(atm_file_path: Path, conf: Config, *, flk_path: Path, extended_i
 
     if conf.conf_data['allow_save_atm_to_new_package']:
         new_file_name = get_new_atm_name(conf)
-        updated_file = save_result(atm_root, file_path, new_file_name=f'{new_file_name}.xml')
+        updated_file = save_result(atm_root, file_path, new_file_name=f'{new_file_name}.xml', is_need_zip=is_need_zip)
         print("[INFO] Создан файл: %s" % updated_file)
         return updated_file
 
@@ -393,6 +410,12 @@ def init() -> argparse.ArgumentParser:
     parser.add_argument('-f', '--file', type=str, required=False, help='xml для обработки')
     parser.add_argument('--flk', type=str, required=False, help='xml c flk для обработки')
     parser.add_argument('--exclude_ids', type=str, default='', help='id записей для исключения из SZPM или ATM файлов')
+    parser.add_argument(
+        '-z',
+        '--zip',
+        action='store_true',
+        help='При сохранении файла, помещает его в одноименный zip-архив. '
+    )
 
     return parser
 
@@ -428,7 +451,7 @@ if __name__ == '__main__':
         prepare_ozps(file_path)
 
     elif file_path.name.lower().startswith('szpm'):
-        prepare_szpm(file_path, conf, args.exclude_ids)
+        prepare_szpm(file_path, conf, args.exclude_ids, is_need_zip=args.zip)
 
     elif file_path.name.lower().startswith('atm'):
         flk_file_param = args.flk
@@ -447,4 +470,4 @@ if __name__ == '__main__':
                 print(f'handling file not found, current path "{flk_path}" is directory.')
                 sys.exit()
 
-        prepare_atm(file_path, conf, flk_path=flk_path, extended_ids_for_exclude=args.exclude_ids)
+        prepare_atm(file_path, conf, flk_path=flk_path, extended_ids_for_exclude=args.exclude_ids, is_need_zip=args.zip)
