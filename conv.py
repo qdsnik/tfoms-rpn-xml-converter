@@ -112,11 +112,12 @@ def save_result(dom, src_file_path: Path, *, new_file_name: str = None, is_need_
     dst_filename = new_file_name or src_file_path.name
     dst_file_data_as_str = etree.tostring(dom, pretty_print=True, encoding='Windows-1251', xml_declaration=True).decode('cp1251')
     if is_need_zip:
-        dst_filename = dst_zip_filename = dst_filename.replace('.xml', '.zip')
+        dst_zip_filename = dst_filename.replace('.xml', '.zip')
         save_as_zip(dst_filename, dst_file_data_as_str, dst_zip_filename, dst_path)
-    else:
-        with open(str(dst_path / dst_filename), "w", encoding='cp1251', errors=None, newline='\r\n') as f:
-            f.write(dst_file_data_as_str)
+        return dst_zip_filename
+    
+    with open(str(dst_path / dst_filename), "w", encoding='cp1251', errors=None, newline='\r\n') as f:
+        f.write(dst_file_data_as_str)
 
     return dst_filename
 
